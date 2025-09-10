@@ -1,11 +1,12 @@
-// Borrowable interface
+
+// Interface Borrowable
 interface Borrowable {
   borrow(memberName: string): string;
   returnItem(): string;
   isAvailable(): boolean;
 }
 
-// Abstract LibraryItem class
+// Abstract class LibraryItem implementing Borrowable
 abstract class LibraryItem implements Borrowable {
   private _title: string;
   protected itemId: string;
@@ -14,11 +15,7 @@ abstract class LibraryItem implements Borrowable {
   constructor(title: string, itemId: string) {
     this._title = title;
     this.itemId = itemId;
-  }
-
-  // ✅ Getter for itemId (ใช้แทน itemId ตรงๆ)
-  public get id(): string {
-    return this.itemId;
+    this._available = true;
   }
 
   // Getter for title
@@ -26,39 +23,45 @@ abstract class LibraryItem implements Borrowable {
     return this._title;
   }
 
-  // Setter for availability
-  public set available(value: boolean) {
-    this._available = value;
+  // Getter for itemId
+  public getItemId(): string {
+    return this.itemId;
   }
 
-  // Implement isAvailable from Borrowable
+  // Setter for availability
+  public available(available: boolean): void {
+    this._available = available;
+  }
+
+  // Implementation of Borrowable
   public isAvailable(): boolean {
     return this._available;
   }
 
-  // Implement borrow from Borrowable
   public borrow(memberName: string): string {
     if (!this._available) {
-      return `Item not available`;
+      return `${this.getKind()} "${this._title}" is not available`;
     }
     this._available = false;
-    return `${this._title} borrowed by ${memberName}`;
+    return `${this.getKind()} ${this._title} borrowed by ${memberName}`;
   }
 
-  // Implement returnItem from Borrowable
   public returnItem(): string {
     if (this._available) {
-      return `${this._title} was not borrowed`;
+      return `${this.getKind()} "${this._title}" was not borrowed`;
     }
     this._available = true;
-    return `${this._title} returned`;
+    return `${this.getKind()} ${this._title} returned`;
   }
 
-  // Abstract method for subclasses to provide details
+  // Subclasses must implement
   public abstract getDetails(): string;
+  protected abstract getKind(): string;
 }
 
-// Subclass: Book
+/* ---------- Subclasses ---------- */
+
+// Book subclass
 class Book extends LibraryItem {
   private author: string;
 
@@ -68,11 +71,15 @@ class Book extends LibraryItem {
   }
 
   public getDetails(): string {
-    return `Book: ${this.title} by ${this.author} (ID: ${this.id})`;
+    return `Book: ${this.title} by ${this.author} (ID: ${this.getItemId()})`;
+  }
+
+  protected getKind(): string {
+    return "Book";
   }
 }
 
-// Subclass: Magazine
+// Magazine subclass
 class Magazine extends LibraryItem {
   private issueDate: string;
 
@@ -82,45 +89,81 @@ class Magazine extends LibraryItem {
   }
 
   public getDetails(): string {
-    return `Magazine: ${this.title} (Issue: ${this.issueDate}) (ID: ${this.id})`;
+    return `Magazine: ${this.title} (Issue: ${this.issueDate}) (ID: ${this.getItemId()})`;
+  }
+
+  protected getKind(): string {
+    return "Magazine";
   }
 }
 
-// Subclass: DVD
+// DVD subclass
 class DVD extends LibraryItem {
-  private director: string;
+  private durationMinutes: number;
+  private director?: string;
+
+  constructor(title: string, itemId: string, durationMinutes: number, director?: string) {
+    super(title, itemId);
+    this.durationMinutes = durationMinutes;
+    this.director = director;
+  }
+
+  public getDetails(): string {
+    const dir = this.director ? ` by ${this.director}` : "";
+    return `DVD: ${this.title}${dir} (${this.durationMinutes} min) (ID: ${this.getItemId()})`;
+  }
+
+  protected getKind(): string {
+    return "DVD";
+  }
+}
+
+// LearningMedia subclass
+class LearningMedia extends LibraryItem {
+  private mediaType: string; // เช่น Video, Audio, eLearning
   private durationMinutes: number;
 
-  constructor(title: string, itemId: string, director: string, durationMinutes: number) {
+  constructor(title: string, itemId: string, mediaType: string, durationMinutes: number) {
     super(title, itemId);
-    this.director = director;
+    this.mediaType = mediaType;
     this.durationMinutes = durationMinutes;
   }
 
   public getDetails(): string {
-    return `DVD: ${this.title} directed by ${this.director} (${this.durationMinutes} min) (ID: ${this.id})`;
+    return `Learning Media: ${this.title} [${this.mediaType}] (${this.durationMinutes} min) (ID: ${this.getItemId()})`;
+  }
+
+  protected getKind(): string {
+    return "Learning Media";
   }
 }
 
+// ResearchReport subclass
+class ResearchReport extends LibraryItem {
+  private author: string;
+  private year: number;
 
-// ----------------------
-// BorrowRecord
-// ----------------------
-class BorrowRecord {
-  constructor(
-    public item: LibraryItem,
-    public borrowedDate: Date,
-    public dueDate: Date
-  ) {}
+  constructor(title: string, itemId: string, author: string, year: number) {
+    super(title, itemId);
+    this.author = author;
+    this.year = year;
+  }
+
+  public getDetails(): string {
+    return `Research Report: "${this.title}" by ${this.author} (${this.year}) (ID: ${this.getItemId()})`;
+  }
+
+  protected getKind(): string {
+    return "Research Report";
+  }
 }
 
-// ----------------------
-// LibraryMember
-// ----------------------
+/* ---------- LibraryMember ---------- */
+
 class LibraryMember {
   private _memberName: string;
   private _memberId: string;
-  private _borrowedItems: BorrowRecord[] = [];
+  private _borrowedItems: LibraryItem[] = [];
 
   constructor(memberName: string, memberId: string) {
     this._memberName = memberName;
@@ -135,54 +178,42 @@ class LibraryMember {
     return this._memberId;
   }
 
-  // Borrow an item
-  public borrowItem(item: LibraryItem, borrowDays: number = 7): string {
+  public borrowItem(item: LibraryItem): string {
     if (!item.isAvailable()) {
-      return `Item not available`;
+      return `Item ${item.getItemId()} not available`;
     }
-    const result = item.borrow(this._memberName);
-    if (!result.startsWith("Item not available")) {
-      const borrowedDate = new Date();
-      const dueDate = new Date();
-      dueDate.setDate(borrowedDate.getDate() + borrowDays);
-
-      this._borrowedItems.push(new BorrowRecord(item, borrowedDate, dueDate));
+    const msg = item.borrow(this._memberName);
+    if (!item.isAvailable()) {
+      this._borrowedItems.push(item);
     }
-    return result;
+    return msg;
   }
 
-  // Return an item by itemId
   public returnItem(itemId: string): string {
-    const idx = this._borrowedItems.findIndex((r) => r.item.id === itemId);
+    const idx = this._borrowedItems.findIndex(i => i.getItemId() === itemId);
     if (idx === -1) {
-      return `Member does not have item with ID ${itemId}`;
+      return `Member ${this._memberName} does not have item ${itemId}`;
     }
-    const record = this._borrowedItems[idx];
-    const result = record.item.returnItem();
-    if (result.endsWith("returned")) {
+    const item = this._borrowedItems[idx];
+    const msg = item.returnItem();
+    if (item.isAvailable()) {
       this._borrowedItems.splice(idx, 1);
     }
-    return result;
+    return msg;
   }
 
-  // List borrowed items
   public listBorrowedItems(): string {
     if (this._borrowedItems.length === 0) {
-      return `${this._memberName} has no borrowed items.`;
+      return `${this._memberName} has no borrowed items`;
     }
-    return this._borrowedItems
-      .map(
-        (r) =>
-          `${r.item.getDetails()} | Borrowed: ${r.borrowedDate.toDateString()} | Due: ${r.dueDate.toDateString()}`
-      )
-      .join("\n");
+    const lines = this._borrowedItems.map(i => i.getDetails());
+    return lines.join("\n");
   }
 }
 
-// ----------------------
-// Library
-// ----------------------
-class Librarys {
+/* ---------- Library ---------- */
+
+class Library {
   private items: LibraryItem[] = [];
   private members: LibraryMember[] = [];
 
@@ -195,84 +226,68 @@ class Librarys {
   }
 
   public findItemById(itemId: string): LibraryItem | undefined {
-    return this.items.find((it) => it.id === itemId);
+    return this.items.find(i => i.getItemId() === itemId);
   }
 
   public findMemberById(memberId: string): LibraryMember | undefined {
-    return this.members.find((m) => m.memberId === memberId);
+    return this.members.find(m => m.memberId === memberId);
   }
 
-  // Borrow an item
-  public borrowItem(memberId: string, itemId: string, borrowDays: number = 7): string {
+  public borrowItem(memberId: string, itemId: string): string {
     const member = this.findMemberById(memberId);
     if (!member) {
-      return `Member with ID ${memberId} not found`;
+      return `Member ${memberId} not found`;
     }
     const item = this.findItemById(itemId);
     if (!item) {
-      return `Item with ID ${itemId} not found`;
+      return `Item ${itemId} not found`;
     }
-    return member.borrowItem(item, borrowDays);
+    return member.borrowItem(item);
   }
 
-  // Return an item
   public returnItem(memberId: string, itemId: string): string {
     const member = this.findMemberById(memberId);
     if (!member) {
-      return `Member with ID ${memberId} not found`;
+      return `Member ${memberId} not found`;
     }
     const item = this.findItemById(itemId);
     if (!item) {
-      return `Item with ID ${itemId} not found`;
+      return `Item ${itemId} not found`;
     }
     return member.returnItem(itemId);
   }
 
-  // Summary of library
   public getLibrarySummary(): string {
-    const itemsSummary =
-      this.items.length === 0
-        ? "No items in library."
-        : this.items
-            .map(
-              (it) => `${it.getDetails()} - ${it.isAvailable() ? "Available" : "Borrowed"}`
-            )
-            .join("\n");
-
-    const membersSummary =
-      this.members.length === 0
-        ? "No members."
-        : this.members
-            .map((m) => `${m.memberName} (ID: ${m.memberId})`)
-            .join("\n");
-
-    return `Library Items:\n${itemsSummary}\n\nMembers:\n${membersSummary}`;
+    const itemLines = this.items.map(i => {
+      const avail = i.isAvailable() ? "Available" : "Borrowed";
+      return `${i.getDetails()} - ${avail}`;
+    });
+    const memberLines = this.members.map(m => `${m.memberName} (ID: ${m.memberId})`);
+    return `Library Summary:\n\nItems:\n${itemLines.join("\n")}\n\nMembers:\n${memberLines.join("\n")}`;
   }
 }
 
-// ----------------------
-// Example usage / test
-// ----------------------
-const library = new Library();
+/* ---------- Example Usage ---------- */
 
 const book = new Book("TypeScript Guide", "B001", "John Doe");
 const magazine = new Magazine("Tech Monthly", "M001", "2023-09");
-const dvd = new DVD("A Great Movie", "D001", "Jane Director", 120);
+const dvd = new DVD("Learning TS", "D001", 120, "Jane Director");
+const lm = new LearningMedia("Intro to AI", "LM001", "Video", 90);
+const rr = new ResearchReport("AI in Education", "RR001", "Dr. Smith", 2024);
 
-const memberAlice = new LibraryMember("Alice", "MEM001");
-const memberBob = new LibraryMember("Bob", "MEM002");
+const member = new LibraryMember("Alice", "MEM001");
+const library = new Library();
 
 library.addItem(book);
 library.addItem(magazine);
 library.addItem(dvd);
+library.addItem(lm);
+library.addItem(rr);
+library.addMember(member);
 
-library.addMember(memberAlice);
-library.addMember(memberBob);
-
-console.log(library.borrowItem("MEM001", "B001", 10)); // Alice ยืมหนังสือ 10 วัน
-console.log(library.borrowItem("MEM002", "B001"));     // Bob พยายามยืมเล่มเดียวกัน
-console.log(memberAlice.listBorrowedItems());
-console.log(library.returnItem("MEM001", "B001"));     // Alice คืน
-console.log(library.borrowItem("MEM002", "B001", 5));  // Bob ยืมได้แล้ว
-console.log(memberBob.listBorrowedItems());
-console.log(library.getLibrarySummary());
+console.log(library.borrowItem("MEM001", "B001")); 
+console.log(member.listBorrowedItems());
+console.log(library.returnItem("MEM001", "B001"));
+console.log(library.borrowItem("MEM001", "LM001"));
+console.log(library.borrowItem("MEM001", "RR001"));
+console.log("\n" + library.getLibrarySummary());
